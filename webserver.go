@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http/httputil"
 	urlpkg "net/url"
 	"strconv"
 	"strings"
@@ -31,7 +32,7 @@ func main() {
 	}
 }
 
-func readRequestStatus(reader *bufio.Reader) (string, string, string, error) {
+func readRequestStatus(reader *bufio.Reader) (method, url, httpVer string, err error) {
 	statusLine, err := reader.ReadString('\n')
 	if err != nil {
 		return "", "", "", err
@@ -39,14 +40,14 @@ func readRequestStatus(reader *bufio.Reader) (string, string, string, error) {
 	trimmed := strings.TrimRight(statusLine, "\r\n")
 
 	status := strings.Split(trimmed, " ")
-	method := status[0]
-	url := status[1]
-	httpVer := status[2]
+	method = status[0]
+	url = status[1]
+	httpVer = status[2]
 
 	return method, url, httpVer, nil
 }
 
-func readResponseStatus(reader *bufio.Reader) (string, int, string, error) {
+func readResponseStatus(reader *bufio.Reader) (httpVer string, statusCode int, statusDescription string, err error) {
 	statusLine, err := reader.ReadString('\n')
 	if err != nil {
 		return "", 0, "", err
@@ -54,17 +55,18 @@ func readResponseStatus(reader *bufio.Reader) (string, int, string, error) {
 	trimmed := strings.TrimRight(statusLine, "\r\n")
 
 	status := strings.Split(trimmed, " ")
-	httpVer := status[0]
-	statusCode, err := strconv.ParseInt(status[1], 10, 0)
+	httpVer = status[0]
+	statusCodeInt64, err := strconv.ParseInt(status[1], 10, 0)
+	statusCode = int(statusCodeInt64)
 	if err != nil {
 		return "", 0, "", err
 	}
-	statusDescription := status[2]
+	statusDescription = status[2]
 
-	return httpVer, int(statusCode), statusDescription, err
+	return httpVer, statusCode, statusDescription, err
 }
 
-func readHostHeader(reader *bufio.Reader) (string, string, error) {
+func readHostHeader(reader *bufio.Reader) (hostURL string, port string, err error) {
 	hostHeaderLine, err := reader.ReadString('\n')
 	if err != nil {
 		return "", "", err
@@ -97,14 +99,18 @@ type Response struct {
 	HTTPVer           string
 }
 
-func request(rawurl string, options *Options) (*Response, error) {
+func request(rawurl string, options *Options) (resp *Response, err error) {
 	url, err := urlpkg.Parse(rawurl)
 	if err != nil {
 		return &Response{}, err
 	}
 
-	port := url.Port()
 	host := url.Hostname()
+	path := url.Path
+	if path == "" {
+		path = "/"
+	}
+	port := url.Port()
 	if port == "" {
 		port = "80"
 	}
@@ -116,17 +122,15 @@ func request(rawurl string, options *Options) (*Response, error) {
 	defer conn.Close()
 
 	if _, ok := options.Headers["Host"]; !ok {
-		options.Headers["Host"] = url.Hostname()
+		options.Headers["Host"] = host
 	}
 
-	var requestHeaders strings.Builder
+	fmt.Fprintf(conn, "%s %s %s\r\n", options.Method, path, options.HTTPVer)
 	for k, v := range options.Headers {
-		fmt.Fprintf(&requestHeaders, "%s: %s\r\n", k, v)
+		fmt.Fprintf(conn, "%s: %s\r\n", k, v)
 	}
-
-	fmt.Fprintf(conn, "%s %s %s\r\n", options.Method, url.Path, options.HTTPVer)
-	fmt.Fprintf(conn, "%s\r\n", requestHeaders.String())
 	fmt.Fprint(conn, "\r\n")
+
 	reader := bufio.NewReader(conn)
 	httpVer, statusCode, statusDescription, err := readResponseStatus(reader)
 	if err != nil {
@@ -153,22 +157,31 @@ func request(rawurl string, options *Options) (*Response, error) {
 		responseHeaders[header[0]] = header[1]
 	}
 
-	contentLength, err := strconv.ParseInt(responseHeaders["Content-Length"], 10, 0)
-	if err != nil {
-		return &Response{}, err
-	}
-
-	body, err := ioutil.ReadAll(io.LimitReader(reader, contentLength))
-	if err != nil {
-		return &Response{}, err
-	}
-
-	resp := &Response{
+	resp = &Response{
 		StatusCode:        statusCode,
 		StatusDescription: statusDescription,
 		Headers:           responseHeaders,
-		Body:              string(body),
+		Body:              "",
 		HTTPVer:           httpVer,
+	}
+
+	if _, ok := responseHeaders["Content-Length"]; ok {
+		contentLength, err := strconv.ParseInt(responseHeaders["Content-Length"], 10, 0)
+		if err != nil {
+			return &Response{}, err
+		}
+		body, err := ioutil.ReadAll(io.LimitReader(reader, contentLength))
+		if err != nil {
+			return &Response{}, err
+		}
+		resp.Body = string(body)
+	} else if responseHeaders["Transfer-Encoding"] == "chunked" {
+		delete(responseHeaders, "Transfer-Encoding")
+		body, err := ioutil.ReadAll(httputil.NewChunkedReader(reader))
+		if err != nil {
+			return &Response{}, err
+		}
+		resp.Body = string(body)
 	}
 
 	return resp, nil
@@ -177,21 +190,51 @@ func request(rawurl string, options *Options) (*Response, error) {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	options := &Options{
-		Method:  "GET",
-		HTTPVer: "HTTP/1.1",
-		Headers: map[string]string{
-			"User-Agent":      "Mozilla/5.0 (X11; Linux x86_64; rv:86.0) Gecko/20100101 Firefox/86.0",
-			"Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-			"Accept-Language": "en-US,en;q=0.5",
-			"Accept-Encoding": "gzip, deflate",
-			"Connection":      "keep-alive",
-		},
-	}
-	resp, err := request("http://www.google.com/", options)
-	if err != nil {
-		log.Print(err)
+	reader := bufio.NewReader(conn)
+
+	method, url, httpVer, err := readRequestStatus(reader)
+
+	if method == "CONNECT" {
+		return
 	}
 
-	fmt.Println(resp)
+	requestHeaders := make(map[string]string)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err != io.EOF {
+				log.Println(err)
+				return
+			}
+			break
+		}
+
+		trimmed := strings.TrimRight(line, "\r\n")
+		if trimmed == "" {
+			break
+		}
+
+		header := strings.Split(trimmed, ": ")
+		requestHeaders[header[0]] = header[1]
+	}
+
+	options := &Options{
+		Method:  method,
+		HTTPVer: httpVer,
+		Headers: requestHeaders,
+	}
+
+	resp, err := request(url, options)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	fmt.Fprintf(conn, "%s %d %s\r\n", resp.HTTPVer, resp.StatusCode, resp.StatusDescription)
+	for k, v := range resp.Headers {
+		fmt.Fprintf(conn, "%s: %s\r\n", k, v)
+	}
+	fmt.Fprint(conn, "\r\n")
+	fmt.Fprint(conn, resp.Body)
 }
