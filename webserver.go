@@ -19,7 +19,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Listning on http://localhost:%d\n", port)
+	log.Printf("Listning on http://localhost:%d\n", port)
 	defer lc.Close()
 
 	for {
@@ -66,23 +66,6 @@ func readResponseStatus(reader *bufio.Reader) (httpVer string, statusCode int, s
 	return httpVer, statusCode, statusDescription, err
 }
 
-func readHostHeader(reader *bufio.Reader) (hostURL string, port string, err error) {
-	hostHeaderLine, err := reader.ReadString('\n')
-	if err != nil {
-		return "", "", err
-	}
-
-	trimmed := strings.TrimRight(hostHeaderLine, "\r\n")
-	hostHeader := strings.Split(trimmed, ": ")
-	hostPortPair := strings.Split(hostHeader[1], ":")
-
-	if len(hostPortPair) == 1 {
-		return hostPortPair[0], "80", nil
-	}
-
-	return hostPortPair[0], hostPortPair[1], nil
-}
-
 // Options struct
 type Options struct {
 	Method  string
@@ -101,6 +84,9 @@ type Response struct {
 
 func request(rawurl string, options *Options) (resp *Response, err error) {
 	url, err := urlpkg.Parse(rawurl)
+	if url.Host == "" {
+		return &Response{}, fmt.Errorf("%q is not a valid URL\n", rawurl)
+	}
 	if err != nil {
 		return &Response{}, err
 	}
@@ -136,25 +122,9 @@ func request(rawurl string, options *Options) (resp *Response, err error) {
 	if err != nil {
 		return &Response{}, err
 	}
-
-	responseHeaders := make(map[string]string)
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err != io.EOF {
-				return &Response{}, err
-			}
-			break
-		}
-
-		trimmed := strings.TrimRight(line, "\r\n")
-		if trimmed == "" {
-			break
-		}
-
-		header := strings.Split(trimmed, ": ")
-		responseHeaders[header[0]] = header[1]
+	responseHeaders, err := readHeaders(reader)
+	if err != nil {
+		return &Response{}, err
 	}
 
 	resp = &Response{
@@ -187,25 +157,15 @@ func request(rawurl string, options *Options) (resp *Response, err error) {
 	return resp, nil
 }
 
-func handleConnection(conn net.Conn) {
-	defer conn.Close()
-
-	reader := bufio.NewReader(conn)
-
-	method, url, httpVer, err := readRequestStatus(reader)
-
-	if method == "CONNECT" {
-		return
-	}
-
-	requestHeaders := make(map[string]string)
+func readHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
+	headers = make(map[string]string)
 
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err != io.EOF {
 				log.Println(err)
-				return
+				return make(map[string]string), err
 			}
 			break
 		}
@@ -216,7 +176,23 @@ func handleConnection(conn net.Conn) {
 		}
 
 		header := strings.Split(trimmed, ": ")
-		requestHeaders[header[0]] = header[1]
+		headers[header[0]] = header[1]
+	}
+
+	return headers, err
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+
+	method, url, httpVer, err := readRequestStatus(reader)
+
+	requestHeaders, err := readHeaders(reader)
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
 	options := &Options{
