@@ -182,12 +182,40 @@ func readHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
 	return headers, err
 }
 
+func handleHttps(conn net.Conn, rawurl, httpVer string) {
+	url, err := urlpkg.Parse(fmt.Sprintf("https://%s/", rawurl))
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	remote, err := net.Dial("tcp", url.Host)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer remote.Close()
+
+	fmt.Fprint(conn, "HTTP/1.1 200 Connection Established\r\n")
+	fmt.Fprint(conn, "\r\n")
+	go io.Copy(remote, conn)
+	io.Copy(conn, remote)
+}
+
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	reader := bufio.NewReader(conn)
 
 	method, url, httpVer, err := readRequestStatus(reader)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	if method == "CONNECT" {
+		handleHttps(conn, url, httpVer)
+		return
+	}
 
 	requestHeaders, err := readHeaders(reader)
 	if err != nil {
