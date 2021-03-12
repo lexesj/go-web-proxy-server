@@ -19,7 +19,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Listning on http://localhost:%d\n", port)
+	log.Printf("Listning on \"http://localhost:%d\"\n", port)
 	defer lc.Close()
 
 	for {
@@ -213,6 +213,7 @@ func handleConnection(conn net.Conn) {
 	}
 
 	if method == "CONNECT" {
+		log.Printf("HTTPS Request %q %q\n", url, httpVer)
 		handleHttps(conn, url, httpVer)
 		return
 	}
@@ -229,6 +230,7 @@ func handleConnection(conn net.Conn) {
 		Headers: requestHeaders,
 	}
 
+	log.Printf("HTTP Request %q %q %q\n", options.Method, url, options.HTTPVer)
 	resp, err := request(url, options)
 	if err != nil {
 		log.Println(err)
