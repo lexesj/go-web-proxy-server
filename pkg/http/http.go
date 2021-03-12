@@ -4,12 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
-	"net/http/httputil"
 	urlpkg "net/url"
-	"strconv"
 	"strings"
 )
 
@@ -18,28 +15,6 @@ type Options struct {
 	Method  string
 	Headers map[string]string
 	HTTPVer string
-}
-
-// Response represents a HTTP response which was returned
-type Response struct {
-	StatusCode        int
-	StatusDescription string
-	Headers           map[string]string
-	Body              string
-	HTTPVer           string
-}
-
-func (resp *Response) String() (str string) {
-	var builder strings.Builder
-
-	fmt.Fprintf(&builder, "%s %d %s\r\n", resp.HTTPVer, resp.StatusCode, resp.StatusDescription)
-	for k, v := range resp.Headers {
-		fmt.Fprintf(&builder, "%s: %s\r\n", k, v)
-	}
-	fmt.Fprint(&builder, "\r\n")
-	fmt.Fprint(&builder, resp.Body)
-
-	return builder.String()
 }
 
 func Request(rawurl string, options *Options) (resp *Response, err error) {
@@ -77,44 +52,7 @@ func Request(rawurl string, options *Options) (resp *Response, err error) {
 	}
 	fmt.Fprint(conn, "\r\n")
 
-	reader := bufio.NewReader(conn)
-	httpVer, statusCode, statusDescription, err := readResponseStatus(reader)
-	if err != nil {
-		return &Response{}, err
-	}
-	responseHeaders, err := ReadHeaders(reader)
-	if err != nil {
-		return &Response{}, err
-	}
-
-	resp = &Response{
-		StatusCode:        statusCode,
-		StatusDescription: statusDescription,
-		Headers:           responseHeaders,
-		Body:              "",
-		HTTPVer:           httpVer,
-	}
-
-	if _, ok := responseHeaders["Content-Length"]; ok {
-		contentLength, err := strconv.ParseInt(responseHeaders["Content-Length"], 10, 0)
-		if err != nil {
-			return &Response{}, err
-		}
-		body, err := ioutil.ReadAll(io.LimitReader(reader, contentLength))
-		if err != nil {
-			return &Response{}, err
-		}
-		resp.Body = string(body)
-	} else if responseHeaders["Transfer-Encoding"] == "chunked" {
-		delete(responseHeaders, "Transfer-Encoding")
-		body, err := ioutil.ReadAll(httputil.NewChunkedReader(reader))
-		if err != nil {
-			return &Response{}, err
-		}
-		resp.Body = string(body)
-	}
-
-	return resp, nil
+	return NewResponse(conn)
 }
 
 func ReadHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
@@ -140,23 +78,4 @@ func ReadHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
 	}
 
 	return headers, err
-}
-
-func readResponseStatus(reader *bufio.Reader) (httpVer string, statusCode int, statusDescription string, err error) {
-	statusLine, err := reader.ReadString('\n')
-	if err != nil {
-		return "", 0, "", err
-	}
-	trimmed := strings.TrimRight(statusLine, "\r\n")
-
-	status := strings.Split(trimmed, " ")
-	httpVer = status[0]
-	statusCodeInt64, err := strconv.ParseInt(status[1], 10, 0)
-	statusCode = int(statusCodeInt64)
-	if err != nil {
-		return "", 0, "", err
-	}
-	statusDescription = status[2]
-
-	return httpVer, statusCode, statusDescription, err
 }
