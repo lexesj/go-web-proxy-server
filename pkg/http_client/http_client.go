@@ -13,20 +13,33 @@ import (
 	"strings"
 )
 
-// Options struct
+// Options represent the options that a request will take
 type Options struct {
 	Method  string
 	Headers map[string]string
 	HTTPVer string
 }
 
-// Response struct
+// Response represents a HTTP response which was returned
 type Response struct {
 	StatusCode        int
 	StatusDescription string
 	Headers           map[string]string
 	Body              string
 	HTTPVer           string
+}
+
+func (resp *Response) String() (str string) {
+	var builder strings.Builder
+
+	fmt.Fprintf(&builder, "%s %d %s\r\n", resp.HTTPVer, resp.StatusCode, resp.StatusDescription)
+	for k, v := range resp.Headers {
+		fmt.Fprintf(&builder, "%s: %s\r\n", k, v)
+	}
+	fmt.Fprint(&builder, "\r\n")
+	fmt.Fprint(&builder, resp.Body)
+
+	return builder.String()
 }
 
 func Request(rawurl string, options *Options) (resp *Response, err error) {

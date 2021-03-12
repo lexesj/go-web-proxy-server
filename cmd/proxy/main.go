@@ -18,7 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Listning on \"http://localhost:%d\"\n", port)
+	log.Printf("[ Listning on \"http://localhost:%d\" ]\n", port)
 	defer lc.Close()
 
 	for {
@@ -77,7 +77,7 @@ func handleConnection(conn net.Conn) {
 	}
 
 	if method == "CONNECT" {
-		log.Printf("HTTPS Request %q %q\n", url, httpVer)
+		log.Printf("[ HTTPS Request %q %q ]\n", url, httpVer)
 		handleHttps(conn, url, httpVer)
 		return
 	}
@@ -94,17 +94,12 @@ func handleConnection(conn net.Conn) {
 		Headers: requestHeaders,
 	}
 
-	log.Printf("HTTP Request %q %q %q\n", options.Method, url, options.HTTPVer)
+	log.Printf("[ HTTP Request %q %q %q ]\n", options.Method, url, options.HTTPVer)
 	resp, err := http_client.Request(url, options)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	fmt.Fprintf(conn, "%s %d %s\r\n", resp.HTTPVer, resp.StatusCode, resp.StatusDescription)
-	for k, v := range resp.Headers {
-		fmt.Fprintf(conn, "%s: %s\r\n", k, v)
-	}
-	fmt.Fprint(conn, "\r\n")
-	fmt.Fprint(conn, resp.Body)
+	fmt.Fprint(conn, resp)
 }
