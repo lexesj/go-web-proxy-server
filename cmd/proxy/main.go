@@ -9,7 +9,7 @@ import (
 	urlpkg "net/url"
 	"strings"
 
-	"github.com/lexesjan/go-web-proxy-server/pkg/http_client"
+	"github.com/lexesjan/go-web-proxy-server/pkg/http"
 )
 
 func main() {
@@ -82,20 +82,20 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	requestHeaders, err := http_client.ReadHeaders(reader)
+	requestHeaders, err := http.ReadHeaders(reader)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	options := &http_client.Options{
+	options := &http.Options{
 		Method:  method,
 		HTTPVer: httpVer,
 		Headers: requestHeaders,
 	}
 
 	log.Printf("[ HTTP Request %q %q %q ]\n", options.Method, url, options.HTTPVer)
-	resp, err := http_client.Request(url, options)
+	resp, err := http.Request(url, options)
 	if err != nil {
 		log.Println(err)
 		return
