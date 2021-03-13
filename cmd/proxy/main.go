@@ -20,7 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("[ Listning on \"http://localhost:%d\" ]\n", port)
+	log.Printf("[Listning on \"http://localhost:%d\"]\n", port)
 	defer lc.Close()
 
 	var cache sync.Map
@@ -63,7 +63,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	timeStart := time.Now()
 	req, err := http.NewRequest(conn)
 	if err != nil {
-		log.Printf("[ Error ] [ Message: %q ]\n", err)
+		log.Printf("[Error] [Message: %q]\n", err)
 		return
 	}
 
@@ -72,7 +72,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	// Handle website blocking.
 	if blocked, ok := blockList.Load(host); ok {
 		if blocked == true {
-			log.Printf("[ Blocked ] [ Host: %q ]\n", host)
+			log.Printf("[Blocked] [Host: %q]\n", host)
 			forbiddenMessage := fmt.Sprintf("Blocked %q by proxy\n", host)
 			respHeaders := map[string]string{"Content-Length": strconv.Itoa(len(forbiddenMessage))}
 			resp := &http.Response{
@@ -89,11 +89,11 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 	// Handle HTTPS request.
 	if req.Method == "CONNECT" {
-		log.Printf("[ HTTPS Request ] [ Method: %q ] [ Host: %q ] [ HTTP Version: %q ]\n",
+		log.Printf("[HTTPS Request] [Method: %q] [Host: %q] [HTTP Version: %q]\n",
 			req.Method, host, req.HTTPVer)
 		err := handleHTTPS(conn, host, req.HTTPVer)
 		if err != nil {
-			log.Printf("[ Error ] [ Message: %q ]\n", err)
+			log.Printf("[Error] [Message: %q]\n", err)
 		}
 		return
 	}
@@ -113,21 +113,21 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 		},
 	)
 	if err != nil {
-		log.Printf("[ Error ] [ Message: %q ]\n", err)
+		log.Printf("[Error] [Message: %q]\n", err)
 		return
 	}
 	duration := time.Since(timeStart)
 	bandwidth := len(resp.String())
 	// Cache is still valid. Return cached response.
 	if cacheFound && resp.StatusCode == 304 {
-		log.Printf("[ Cached ] [ HTTP Response ] [ Method: %q ] [ Request URL: %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
+		log.Printf("[Cached] [HTTP Response] [Method: %q] [Request URL: %q] [HTTP Version: %q] [Bandwidth: %d bytes] [Time: %s]\n",
 			req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 		fmt.Fprint(conn, cachedResponse)
 		return
 	}
 
 	// Forward response to client.
-	log.Printf("[ HTTP Response ] [ Method: %q ] [ Request URL: %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
+	log.Printf("[HTTP Response] [Method: %q] [Request URL: %q] [HTTP Version: %q] [Bandwidth: %d bytes] [Time: %s]\n",
 		req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 	fmt.Fprint(conn, resp)
 	cache.Store(uri, resp.String())
