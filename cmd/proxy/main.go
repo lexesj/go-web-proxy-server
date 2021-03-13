@@ -52,27 +52,37 @@ func commandDispatcher(blockList *sync.Map) {
 
 		trimmedInput := strings.TrimRight(input, "\n")
 		tokens := strings.Split(trimmedInput, " ")
-		switch {
-		case len(tokens) <= 1:
-			fmt.Println("Not enough arguments")
-		case tokens[0] == "block":
-			website := tokens[1]
-			_, loaded := blockList.LoadOrStore(website, true)
-			if !loaded {
-				fmt.Printf("Blocked %q\n", website)
-			} else {
-				fmt.Printf("Website %q already blocked\n", website)
+		command := tokens[0]
+		if command != "" {
+			switch command {
+			case "block":
+				if len(tokens) == 1 {
+					fmt.Fprintf(os.Stderr, "usage: block <domain name>\n")
+					continue
+				}
+
+				website := tokens[1]
+				_, loaded := blockList.LoadOrStore(website, true)
+				if !loaded {
+					fmt.Printf("%s: blocked %q\n", command, website)
+				} else {
+					fmt.Fprintf(os.Stderr, "%s: website %q already blocked\n", command, website)
+				}
+			case "unblock":
+				if len(tokens) == 1 {
+					fmt.Fprintf(os.Stderr, "usage: unblock <domain name>\n")
+				}
+
+				website := tokens[1]
+				_, found := blockList.LoadAndDelete(website)
+				if found {
+					fmt.Printf("%s: unblocked %q\n", command, website)
+				} else {
+					fmt.Fprintf(os.Stderr, "%s: website %q not blocked\n", command, website)
+				}
+			default:
+				fmt.Printf("proxy: %q: command not found\n", tokens[0])
 			}
-		case tokens[0] == "unblock":
-			website := tokens[1]
-			_, found := blockList.LoadAndDelete(website)
-			if found {
-				fmt.Printf("Unblocked %q\n", website)
-			} else {
-				fmt.Printf("Website %q not blocked\n", website)
-			}
-		default:
-			fmt.Printf("Invalid command %q\n", tokens[0])
 		}
 	}
 }
