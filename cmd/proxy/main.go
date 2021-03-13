@@ -62,7 +62,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 	req, err := http.NewRequest(conn)
 	if err != nil {
-		log.Printf("[ Error %q ]\n", err)
+		log.Printf("[ Error ] [ Message: %q ]\n", err)
 		return
 	}
 
@@ -70,7 +70,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	// Handle website blocking.
 	if blocked, ok := blockList.Load(host); ok {
 		if blocked == true {
-			log.Printf("[ Blocked %q ]\n", host)
+			log.Printf("[ Blocked ] [ Host: %q ]\n", host)
 			forbiddenMessage := fmt.Sprintf("Blocked %q by proxy\n", host)
 			respHeaders := map[string]string{"Content-Length": strconv.Itoa(len(forbiddenMessage))}
 			resp := &http.Response{
@@ -90,7 +90,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 		log.Printf("[ HTTPS Request ] [ Method: %q ] [ Host: %q ] [ HTTP Version: %q ]\n", req.Method, host, req.HTTPVer)
 		err := handleHTTPS(conn, host, req.HTTPVer)
 		if err != nil {
-			log.Printf("[ Error %q ]\n", err)
+			log.Printf("[ Error ] [ Message: %q ]\n", err)
 		}
 		return
 	}
@@ -110,7 +110,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 		},
 	)
 	if err != nil {
-		log.Printf("[ Error %q ]\n", err)
+		log.Printf("[ Error ] [ Message: %q ]\n", err)
 		return
 	}
 	// Cache is still valid. Return cached response.
