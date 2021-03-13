@@ -8,25 +8,13 @@ import (
 	"sync"
 
 	"github.com/lexesjan/go-web-proxy-server/pkg/log"
-	"github.com/mgutz/ansi"
-)
-
-// Prompt is the commandline prompt which has colours
-var Prompt = fmt.Sprintf(
-	"%s[%s%sProxy%s%s]$%s ",
-	ansi.LightGreen,
-	ansi.Reset,
-	ansi.ColorCode("white+bh"),
-	ansi.Reset,
-	ansi.LightGreen,
-	ansi.Reset,
 )
 
 // Dispatcher handles the user input and modifies the blockList
 func Dispatcher(blockList *sync.Map) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print(Prompt)
+		fmt.Printf("\r%s", log.Prompt)
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			log.ProxyError(err)

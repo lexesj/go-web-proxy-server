@@ -2,25 +2,47 @@ package log
 
 import (
 	"fmt"
-	logpkg "log"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/mgutz/ansi"
 )
 
-var bold = ansi.ColorCode("white+bh")
+// Bold ansi code
+var Bold = ansi.ColorCode("white+bh")
+
+// Prompt is the commandline prompt which has colours
+var Prompt = fmt.Sprintf(
+	"%s[%s%sProxy%s%s]$%s ",
+	ansi.LightGreen,
+	ansi.Reset,
+	ansi.ColorCode("white+bh"),
+	ansi.Reset,
+	ansi.LightGreen,
+	ansi.Reset,
+)
+
+func output(str string) {
+	currentTime := time.Now().Format("01/02/06 15:04:05")
+	if !strings.HasSuffix(str, "\n") {
+		str = str + "\n"
+	}
+	fmt.Fprintf(os.Stderr, "\r%s %s%s", currentTime, str, Prompt)
+}
 
 // ProxyError logs an error has occurred and the message
 func ProxyError(err error) {
-	logpkg.Printf(
+	output(fmt.Sprintf(
 		"%s[%s%sError%s%s]%s [Message: %q]\n",
 		ansi.LightRed,
 		ansi.Reset,
-		bold,
+		Bold,
 		ansi.Reset,
 		ansi.LightRed,
 		ansi.Reset,
 		err,
-	)
+	))
 }
 
 // ProxyHTTPResponse logs a proxy HTTP response
@@ -63,44 +85,44 @@ func proxy(protocol, messageType, colour, info string, cached bool) {
 		cachedMessage = ""
 	}
 
-	logpkg.Printf(
+	output(fmt.Sprintf(
 		"%s%s[%s%s%s %s%s%s]%s %s\n",
 		cachedMessage,
 		colour,
 		ansi.Reset,
-		bold,
+		Bold,
 		protocol,
 		messageType,
 		ansi.Reset,
 		colour,
 		ansi.Reset,
 		info,
-	)
+	))
 }
 
 // ProxyBlock logs blocked message when the proxy blocks a website
 func ProxyBlock(host string) {
-	logpkg.Printf(
+	output(fmt.Sprintf(
 		"%s[%sBlocked%s]%s [Host %q]\n",
 		ansi.Magenta,
 		ansi.Reset,
 		ansi.Magenta,
 		ansi.Reset,
 		host,
-	)
+	))
 }
 
 // ProxyListen logs the listening message on proxy startup
 func ProxyListen(host string, port int) {
-	logpkg.Printf(
+	output(fmt.Sprintf(
 		"%s[%s%sListening on \"http://%s:%d\"%s%s]%s\n",
 		ansi.LightYellow,
 		ansi.Reset,
-		bold,
+		Bold,
 		host,
 		port,
 		ansi.Reset,
 		ansi.LightYellow,
 		ansi.Reset,
-	)
+	))
 }
