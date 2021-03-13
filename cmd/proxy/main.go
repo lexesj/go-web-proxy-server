@@ -60,6 +60,7 @@ func handleHTTPS(conn net.Conn, rawurl, httpVer string) (err error) {
 func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	defer conn.Close()
 
+	timeStart := time.Now()
 	req, err := http.NewRequest(conn)
 	if err != nil {
 		log.Printf("[ Error ] [ Message: %q ]\n", err)
@@ -67,6 +68,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	}
 
 	host := req.Headers["Host"]
+	uri := fmt.Sprintf("%s%s", host, req.Path)
 	// Handle website blocking.
 	if blocked, ok := blockList.Load(host); ok {
 		if blocked == true {
@@ -96,7 +98,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	}
 
 	// Handle HTTP request.
-	cachedResponse, cacheFound := cache.Load(host)
+	cachedResponse, cacheFound := cache.Load(uri)
 	if cacheFound {
 		currTimeFormatted := time.Now().In(time.UTC).Format(http.TimeFormat)
 		req.Headers["If-Modified-Since"] = currTimeFormatted
@@ -113,15 +115,17 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 		log.Printf("[ Error ] [ Message: %q ]\n", err)
 		return
 	}
+	duration := time.Since(timeStart)
+	bandwidth := len(resp.String())
 	// Cache is still valid. Return cached response.
 	if cacheFound && resp.StatusCode == 304 {
-		log.Printf("[ HTTP Response Cached ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ]\n", req.Method, reqURL, req.HTTPVer)
+		log.Printf("[ HTTP Response Cached ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n", req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 		fmt.Fprint(conn, cachedResponse)
 		return
 	}
 
 	// Forward response to client.
-	log.Printf("[ HTTP Response ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ]\n", req.Method, reqURL, req.HTTPVer)
+	log.Printf("[ HTTP Response ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n", req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 	fmt.Fprint(conn, resp)
-	cache.Store(host, resp.String())
+	cache.Store(uri, resp.String())
 }
