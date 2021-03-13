@@ -104,7 +104,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 		currTimeFormatted := time.Now().In(time.UTC).Format(http.TimeFormat)
 		req.Headers["If-Modified-Since"] = currTimeFormatted
 	}
-	reqURL := fmt.Sprintf("http://%s", host)
+	reqURL := fmt.Sprintf("http://%s%s", host, req.Path)
 	resp, err := httpclient.Request(reqURL,
 		&httpclient.Options{
 			Method:  req.Method,
@@ -120,14 +120,14 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	bandwidth := len(resp.String())
 	// Cache is still valid. Return cached response.
 	if cacheFound && resp.StatusCode == 304 {
-		log.Printf("[ Cached ] [ HTTP Response ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
+		log.Printf("[ Cached ] [ HTTP Response ] [ Method: %q ] [ Request URL: %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
 			req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 		fmt.Fprint(conn, cachedResponse)
 		return
 	}
 
 	// Forward response to client.
-	log.Printf("[ HTTP Response ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
+	log.Printf("[ HTTP Response ] [ Method: %q ] [ Request URL: %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
 		req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 	fmt.Fprint(conn, resp)
 	cache.Store(uri, resp.String())
