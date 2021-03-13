@@ -1,15 +1,14 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	urlpkg "net/url"
-	"strings"
 
 	"github.com/lexesjan/go-web-proxy-server/pkg/http"
+	"github.com/lexesjan/go-web-proxy-server/pkg/httpclient"
 )
 
 func main() {
@@ -29,21 +28,6 @@ func main() {
 
 		go handleConnection(conn)
 	}
-}
-
-func readRequestStatus(reader *bufio.Reader) (method, url, httpVer string, err error) {
-	statusLine, err := reader.ReadString('\n')
-	if err != nil {
-		return "", "", "", err
-	}
-	trimmed := strings.TrimRight(statusLine, "\r\n")
-
-	status := strings.Split(trimmed, " ")
-	method = status[0]
-	url = status[1]
-	httpVer = status[2]
-
-	return method, url, httpVer, nil
 }
 
 func handleHttps(conn net.Conn, rawurl, httpVer string) {
@@ -68,34 +52,26 @@ func handleHttps(conn net.Conn, rawurl, httpVer string) {
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
-	reader := bufio.NewReader(conn)
-
-	method, url, httpVer, err := readRequestStatus(reader)
+	req, err := http.NewRequest(conn)
 	if err != nil {
 		log.Println(err)
+	}
+
+	host := req.Headers["Host"]
+	if req.Method == "CONNECT" {
+		log.Printf("[ HTTPS Request %q %q ]\n", host, req.HTTPVer)
+		handleHttps(conn, host, req.HTTPVer)
 		return
 	}
-
-	if method == "CONNECT" {
-		log.Printf("[ HTTPS Request %q %q ]\n", url, httpVer)
-		handleHttps(conn, url, httpVer)
-		return
-	}
-
-	requestHeaders, err := http.ReadHeaders(reader)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	options := &http.Options{
-		Method:  method,
-		HTTPVer: httpVer,
-		Headers: requestHeaders,
-	}
-
-	log.Printf("[ HTTP Request %q %q %q ]\n", options.Method, url, options.HTTPVer)
-	resp, err := http.Request(url, options)
+	reqUrl := fmt.Sprintf("http://%s", host)
+	log.Printf("[ HTTP Request %q %q %q ]\n", req.Method, reqUrl, req.HTTPVer)
+	resp, err := httpclient.Request(reqUrl,
+		&httpclient.Options{
+			Method:  req.Method,
+			HTTPVer: req.HTTPVer,
+			Headers: req.Headers,
+		},
+	)
 	if err != nil {
 		log.Println(err)
 		return
