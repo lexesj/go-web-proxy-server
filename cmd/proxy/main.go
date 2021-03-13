@@ -67,8 +67,8 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 	host := req.Headers["Host"]
 	// Handle website blocking.
-	if value, ok := blockList.Load(host); ok {
-		if value == true {
+	if blocked, ok := blockList.Load(host); ok {
+		if blocked == true {
 			log.Printf("[ Blocked %q ]\n", host)
 			forbiddenMessage := fmt.Sprintf("Blocked %q by proxy\n", host)
 			respHeaders := map[string]string{"Content-Length": strconv.Itoa(len(forbiddenMessage))}
@@ -95,6 +95,9 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	}
 
 	// Handle HTTP request.
+	// if cachedResponse, ok := cache.Load(host); ok {
+	// 	req.Headers["If-"]
+	// }
 	reqURL := fmt.Sprintf("http://%s", host)
 	log.Printf("[ HTTP Request %q %q %q ]\n", req.Method, reqURL, req.HTTPVer)
 	resp, err := httpclient.Request(reqURL,
