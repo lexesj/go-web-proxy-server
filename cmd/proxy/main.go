@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	urlpkg "net/url"
+	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +29,8 @@ func main() {
 	var cache sync.Map
 	var blockList sync.Map
 
+	go commandDispatcher(&blockList)
+
 	for {
 		conn, err := lc.Accept()
 		if err != nil {
@@ -36,25 +41,40 @@ func main() {
 	}
 }
 
-func handleHTTPS(conn net.Conn, rawurl, httpVer string) (err error) {
-	url, err := urlpkg.Parse(fmt.Sprintf("https://%s/", rawurl))
-	if err != nil {
-		return err
+func commandDispatcher(blockList *sync.Map) {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		fmt.Print("[Proxy]$ ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			log.Printf("[Error] [Message: %q]\n", err)
+		}
+
+		trimmedInput := strings.TrimRight(input, "\n")
+		tokens := strings.Split(trimmedInput, " ")
+		switch {
+		case len(tokens) <= 1:
+			fmt.Println("Not enough arguments")
+		case tokens[0] == "block":
+			website := tokens[1]
+			_, loaded := blockList.LoadOrStore(website, true)
+			if !loaded {
+				fmt.Printf("Blocked %q\n", website)
+			} else {
+				fmt.Printf("Website %q already blocked\n", website)
+			}
+		case tokens[0] == "unblock":
+			website := tokens[1]
+			_, found := blockList.LoadAndDelete(website)
+			if found {
+				fmt.Printf("Unblocked %q\n", website)
+			} else {
+				fmt.Printf("Website %q not blocked\n", website)
+			}
+		default:
+			fmt.Printf("Invalid command %q\n", tokens[0])
+		}
 	}
-	remote, err := net.Dial("tcp", url.Host)
-	if err != nil {
-		return err
-	}
-	defer remote.Close()
-
-	fmt.Fprint(conn, "HTTP/1.1 200 Connection Established\r\n")
-	fmt.Fprint(conn, "\r\n")
-
-	// Tunnel between client and server.
-	go io.Copy(remote, conn)
-	io.Copy(conn, remote)
-
-	return nil
 }
 
 func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
@@ -131,4 +151,25 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 		req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 	fmt.Fprint(conn, resp)
 	cache.Store(uri, resp.String())
+}
+
+func handleHTTPS(conn net.Conn, rawurl, httpVer string) (err error) {
+	url, err := urlpkg.Parse(fmt.Sprintf("https://%s/", rawurl))
+	if err != nil {
+		return err
+	}
+	remote, err := net.Dial("tcp", url.Host)
+	if err != nil {
+		return err
+	}
+	defer remote.Close()
+
+	fmt.Fprint(conn, "HTTP/1.1 200 Connection Established\r\n")
+	fmt.Fprint(conn, "\r\n")
+
+	// Tunnel between client and server.
+	go io.Copy(remote, conn)
+	io.Copy(conn, remote)
+
+	return nil
 }
