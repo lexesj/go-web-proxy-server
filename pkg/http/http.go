@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// ReadHeaders will parse the HTTP headers in a HTTP message. The reader must
+// have already read the HTTP status line prior to calling this function.
 func ReadHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
 	headers = make(map[string]string)
 
@@ -19,12 +21,11 @@ func ReadHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
 			}
 			break
 		}
-
 		trimmed := strings.TrimRight(line, "\r\n")
+		// End of headers, start of body.
 		if trimmed == "" {
 			break
 		}
-
 		header := strings.Split(trimmed, ": ")
 		headers[header[0]] = header[1]
 	}

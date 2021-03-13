@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Response represents a HTTP response
+// Response represents a HTTP response.
 type Response struct {
 	StatusCode        int
 	StatusDescription string
@@ -20,6 +20,8 @@ type Response struct {
 	HTTPVer           string
 }
 
+// NewResponse returns a new Response created by reading the connection and
+// parsing the HTTP response message.
 func NewResponse(conn net.Conn) (resp *Response, err error) {
 	reader := bufio.NewReader(conn)
 	httpVer, statusCode, statusDescription, err := readResponseStatus(reader)
@@ -40,6 +42,7 @@ func NewResponse(conn net.Conn) (resp *Response, err error) {
 		HTTPVer:           httpVer,
 	}
 
+	// Parse Body if exists
 	if _, ok := responseHeaders["Content-Length"]; ok {
 		contentLength, err := strconv.ParseInt(responseHeaders["Content-Length"], 10, 0)
 		if err != nil {
@@ -67,15 +70,16 @@ func readResponseStatus(reader *bufio.Reader) (httpVer string, statusCode int, s
 	if err != nil {
 		return "", 0, "", err
 	}
-	trimmed := strings.TrimRight(statusLine, "\r\n")
 
+	trimmed := strings.TrimRight(statusLine, "\r\n")
 	status := strings.Split(trimmed, " ")
 	httpVer = status[0]
 	statusCodeInt64, err := strconv.ParseInt(status[1], 10, 0)
-	statusCode = int(statusCodeInt64)
 	if err != nil {
 		return "", 0, "", err
 	}
+
+	statusCode = int(statusCodeInt64)
 	statusDescription = status[2]
 
 	return httpVer, statusCode, statusDescription, err

@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Response represents a HTTP request
+// Request represents a HTTP request.
 type Request struct {
 	Method  string
 	Path    string
@@ -20,6 +20,8 @@ type Request struct {
 	Body    string
 }
 
+// NewRequest returns a new Request created by reading the connection and
+// parsing the HTTP request message.
 func NewRequest(conn net.Conn) (req *Request, err error) {
 	reader := bufio.NewReader(conn)
 	method, path, httpVer, err := readRequestStatus(reader)
@@ -27,6 +29,7 @@ func NewRequest(conn net.Conn) (req *Request, err error) {
 		return &Request{}, err
 	}
 
+	// Proxy HTTP request.
 	if !strings.HasPrefix(path, "/") {
 		url, err := urlpkg.Parse(fmt.Sprintf("http://%s", path))
 		if err != nil {
@@ -49,6 +52,7 @@ func NewRequest(conn net.Conn) (req *Request, err error) {
 		Body:    "",
 	}
 
+	// Parse body if exists.
 	if _, ok := requestHeaders["Content-Length"]; ok {
 		contentLength, err := strconv.ParseInt(requestHeaders["Content-Length"], 10, 0)
 		if err != nil {
@@ -71,8 +75,8 @@ func readRequestStatus(reader *bufio.Reader) (method, url, httpVer string, err e
 	if err != nil {
 		return "", "", "", err
 	}
-	trimmed := strings.TrimRight(statusLine, "\r\n")
 
+	trimmed := strings.TrimRight(statusLine, "\r\n")
 	status := strings.Split(trimmed, " ")
 	method = status[0]
 	url = status[1]

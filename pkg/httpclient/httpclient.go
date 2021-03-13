@@ -8,22 +8,25 @@ import (
 	"github.com/lexesjan/go-web-proxy-server/pkg/http"
 )
 
-// Options represent the options that a request will take
+// Options represent the options that a request will take.
 type Options struct {
 	Method  string
 	Headers map[string]string
 	HTTPVer string
 }
 
+// Request performs a HTTP request to the url specified with the options
+// specified.
 func Request(rawurl string, options *Options) (resp *http.Response, err error) {
 	url, err := urlpkg.Parse(rawurl)
 	if url.Host == "" {
-		return &http.Response{}, fmt.Errorf("%q is not a valid URL\n", rawurl)
+		return &http.Response{}, fmt.Errorf("%q is not a valid URL", rawurl)
 	}
 	if err != nil {
 		return &http.Response{}, err
 	}
 
+	// Set default hostname and port
 	host := url.Hostname()
 	path := url.Path
 	if path == "" {
@@ -33,6 +36,8 @@ func Request(rawurl string, options *Options) (resp *http.Response, err error) {
 	if port == "" {
 		port = "80"
 	}
+
+	// Initiate TCP connection with host.
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", host, port))
 	if err != nil {
 		return &http.Response{}, err
@@ -49,6 +54,7 @@ func Request(rawurl string, options *Options) (resp *http.Response, err error) {
 		HTTPVer: options.HTTPVer,
 		Headers: options.Headers,
 	}
+	// Send HTTP request.
 	fmt.Fprint(conn, req)
 
 	return http.NewResponse(conn)

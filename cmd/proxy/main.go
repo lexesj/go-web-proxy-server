@@ -30,7 +30,7 @@ func main() {
 	}
 }
 
-func handleHttps(conn net.Conn, rawurl, httpVer string) {
+func handleHTTPS(conn net.Conn, rawurl, httpVer string) {
 	url, err := urlpkg.Parse(fmt.Sprintf("https://%s/", rawurl))
 	if err != nil {
 		log.Println(err)
@@ -45,6 +45,8 @@ func handleHttps(conn net.Conn, rawurl, httpVer string) {
 
 	fmt.Fprint(conn, "HTTP/1.1 200 Connection Established\r\n")
 	fmt.Fprint(conn, "\r\n")
+
+	// Tunnel between client and server.
 	go io.Copy(remote, conn)
 	io.Copy(conn, remote)
 }
@@ -58,14 +60,17 @@ func handleConnection(conn net.Conn) {
 	}
 
 	host := req.Headers["Host"]
+	// Handle HTTPS request.
 	if req.Method == "CONNECT" {
 		log.Printf("[ HTTPS Request %q %q ]\n", host, req.HTTPVer)
-		handleHttps(conn, host, req.HTTPVer)
+		handleHTTPS(conn, host, req.HTTPVer)
 		return
 	}
-	reqUrl := fmt.Sprintf("http://%s", host)
-	log.Printf("[ HTTP Request %q %q %q ]\n", req.Method, reqUrl, req.HTTPVer)
-	resp, err := httpclient.Request(reqUrl,
+
+	// Handle HTTP request.
+	reqURL := fmt.Sprintf("http://%s", host)
+	log.Printf("[ HTTP Request %q %q %q ]\n", req.Method, reqURL, req.HTTPVer)
+	resp, err := httpclient.Request(reqURL,
 		&httpclient.Options{
 			Method:  req.Method,
 			HTTPVer: req.HTTPVer,
