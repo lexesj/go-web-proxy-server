@@ -8,6 +8,7 @@ import (
 	urlpkg "net/url"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/lexesjan/go-web-proxy-server/pkg/http"
 	"github.com/lexesjan/go-web-proxy-server/pkg/httpclient"
@@ -86,7 +87,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 	// Handle HTTPS request.
 	if req.Method == "CONNECT" {
-		log.Printf("[ HTTPS Request %q %q ]\n", host, req.HTTPVer)
+		log.Printf("[ HTTPS %q %q %q ]\n", req.Method, host, req.HTTPVer)
 		err := handleHTTPS(conn, host, req.HTTPVer)
 		if err != nil {
 			log.Printf("[ Error %q ]\n", err)
@@ -95,11 +96,12 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	}
 
 	// Handle HTTP request.
-	// if cachedResponse, ok := cache.Load(host); ok {
-	// 	req.Headers["If-"]
-	// }
+	cachedResponse, cacheFound := cache.Load(host)
+	if cacheFound {
+		currTimeFormatted := time.Now().In(time.UTC).Format(http.TimeFormat)
+		req.Headers["If-Modified-Since"] = currTimeFormatted
+	}
 	reqURL := fmt.Sprintf("http://%s", host)
-	log.Printf("[ HTTP Request %q %q %q ]\n", req.Method, reqURL, req.HTTPVer)
 	resp, err := httpclient.Request(reqURL,
 		&httpclient.Options{
 			Method:  req.Method,
@@ -111,7 +113,15 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 		log.Printf("[ Error %q ]\n", err)
 		return
 	}
+	// Cache is still valid. Return cached response.
+	if cacheFound && resp.StatusCode == 304 {
+		log.Printf("[ HTTP Response Cached %q %q %q ]\n", req.Method, reqURL, req.HTTPVer)
+		fmt.Fprint(conn, cachedResponse)
+		return
+	}
 
 	// Forward response to client.
+	log.Printf("[ HTTP Response %q %q %q ]\n", req.Method, reqURL, req.HTTPVer)
 	fmt.Fprint(conn, resp)
+	cache.Store(host, resp.String())
 }

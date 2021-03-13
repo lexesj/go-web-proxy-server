@@ -32,3 +32,7 @@ func ReadHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
 
 	return headers, err
 }
+
+// TimeFormat is an example of the HTTP date format. It can be used in the
+// ParseTime function.
+const TimeFormat = "Mon, 02 Jan 2006 15:04:05 GMT"
