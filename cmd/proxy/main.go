@@ -89,7 +89,8 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 	// Handle HTTPS request.
 	if req.Method == "CONNECT" {
-		log.Printf("[ HTTPS Request ] [ Method: %q ] [ Host: %q ] [ HTTP Version: %q ]\n", req.Method, host, req.HTTPVer)
+		log.Printf("[ HTTPS Request ] [ Method: %q ] [ Host: %q ] [ HTTP Version: %q ]\n",
+			req.Method, host, req.HTTPVer)
 		err := handleHTTPS(conn, host, req.HTTPVer)
 		if err != nil {
 			log.Printf("[ Error ] [ Message: %q ]\n", err)
@@ -119,13 +120,15 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	bandwidth := len(resp.String())
 	// Cache is still valid. Return cached response.
 	if cacheFound && resp.StatusCode == 304 {
-		log.Printf("[ HTTP Response Cached ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n", req.Method, reqURL, req.HTTPVer, bandwidth, duration)
+		log.Printf("[ Cached ] [ HTTP Response ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
+			req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 		fmt.Fprint(conn, cachedResponse)
 		return
 	}
 
 	// Forward response to client.
-	log.Printf("[ HTTP Response ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n", req.Method, reqURL, req.HTTPVer, bandwidth, duration)
+	log.Printf("[ HTTP Response ] [ Method: %q ] [ Request: URL %q ] [ HTTP Version: %q ] [ Bandwidth: %d bytes ] [ Time: %s ]\n",
+		req.Method, reqURL, req.HTTPVer, bandwidth, duration)
 	fmt.Fprint(conn, resp)
 	cache.Store(uri, resp.String())
 }

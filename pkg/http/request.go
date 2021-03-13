@@ -31,7 +31,7 @@ func NewRequest(conn net.Conn) (req *Request, err error) {
 
 	// Proxy HTTP request.
 	if !strings.HasPrefix(path, "/") {
-		url, err := urlpkg.Parse(fmt.Sprintf("http://%s", path))
+		url, err := urlpkg.Parse(path)
 		if err != nil {
 			return &Request{}, err
 		}
