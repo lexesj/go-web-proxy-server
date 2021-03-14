@@ -100,6 +100,7 @@ func handleConnection(conn net.Conn, cache *cache.Cache, blockList *sync.Map, me
 }
 
 func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
+	log.ProxyHTTPSRequest(req)
 	rawurl := req.Headers["Host"]
 	url, err := urlpkg.Parse(fmt.Sprintf("https://%s/", rawurl))
 	if err != nil {
@@ -118,7 +119,6 @@ func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
 	go io.Copy(remote, conn)
 	io.Copy(conn, remote)
 
-	log.ProxyHTTPSRequest(req)
 	return nil
 }
 
