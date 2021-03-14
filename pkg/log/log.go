@@ -36,12 +36,12 @@ func NewLogger() (logger *Logger) {
 
 func (logger *Logger) output(str string) {
 	logger.mu.Lock()
+	defer logger.mu.Unlock()
 	currentTime := time.Now().Format("01/02/06 15:04:05")
 	if !strings.HasSuffix(str, "\n") {
 		str = str + "\n"
 	}
 	fmt.Fprintf(os.Stderr, "\r%s %s%s", currentTime, str, Prompt)
-	logger.mu.Unlock()
 }
 
 var logger = NewLogger()

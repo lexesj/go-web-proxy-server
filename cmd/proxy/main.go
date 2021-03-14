@@ -70,7 +70,6 @@ func (entry *cacheEntry) resetTimer(uri string, cacheControl []string) (err erro
 func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	defer conn.Close()
 
-	timeStart := time.Now()
 	req, err := http.NewRequest(conn)
 	if err != nil {
 		log.ProxyError(err)
@@ -78,7 +77,6 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	}
 
 	host := req.Headers["Host"]
-	uri := fmt.Sprintf("%s%s", host, req.Path)
 	// Handle website blocking.
 	if blocked, ok := blockList.Load(host); ok {
 		if blocked == true {
@@ -107,65 +105,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	}
 
 	// Handle HTTP request.
-	reqOptions := &httpclient.Options{
-		Method:  req.Method,
-		HTTPVer: req.HTTPVer,
-		Headers: req.Headers,
-	}
-	reqURL := fmt.Sprintf("http://%s%s", host, req.Path)
-	cachedEntryInterface, cacheFound := cache.Load(uri)
-	if cacheFound {
-		cachedEntry := cachedEntryInterface.(*cacheEntry)
-		if cachedEntry.stale {
-			currTimeFormatted := time.Now().In(time.UTC).Format(http.TimeFormat)
-			req.Headers["If-Modified-Since"] = currTimeFormatted
-			resp, err := httpclient.Request(reqURL, reqOptions)
-			if err != nil {
-				log.ProxyError(err)
-				return
-			}
-
-			// Cached response is still valid
-			if resp.StatusCode == 304 {
-				fmt.Fprint(conn, cachedEntry.response)
-				duration := time.Since(timeStart)
-				log.ProxyHTTPResponse(req, resp, duration.String(), true)
-				cachedEntry.resetTimer(uri, resp.Headers.CacheControl())
-				if err != nil {
-					log.ProxyError(err)
-				}
-				return
-			}
-
-			// Forward response to client.
-			fmt.Fprint(conn, resp)
-			duration := time.Since(timeStart)
-			log.ProxyHTTPResponse(req, resp, duration.String(), false)
-			err = cacheResponse(uri, resp, cache)
-			if err != nil {
-				log.ProxyError(err)
-			}
-		} else {
-			// Return cached response as it is not stale
-			fmt.Fprint(conn, cachedEntry.response)
-			duration := time.Since(timeStart)
-			log.ProxyHTTPResponse(req, &http.Response{}, duration.String(), true)
-		}
-		return
-	}
-
-	// Response not in cache
-	resp, err := httpclient.Request(reqURL, reqOptions)
-	if err != nil {
-		log.ProxyError(err)
-		return
-	}
-
-	// Forward response to client.
-	fmt.Fprint(conn, resp)
-	duration := time.Since(timeStart)
-	log.ProxyHTTPResponse(req, resp, duration.String(), false)
-	err = cacheResponse(uri, resp, cache)
+	err = handleHTTP(conn, req, cache)
 	if err != nil {
 		log.ProxyError(err)
 	}
@@ -194,6 +134,61 @@ func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
 	return nil
 }
 
+func handleHTTP(conn net.Conn, req *http.Request, cache *sync.Map) (err error) {
+	host := req.Headers["Host"]
+	timeStart := time.Now()
+	uri := fmt.Sprintf("%s%s", host, req.Path)
+	reqOptions := &httpclient.Options{
+		Method:  req.Method,
+		HTTPVer: req.HTTPVer,
+		Headers: req.Headers,
+	}
+	reqURL := fmt.Sprintf("http://%s%s", host, req.Path)
+	cachedEntryInterface, cacheFound := cache.Load(uri)
+	if cacheFound {
+		cachedEntry := cachedEntryInterface.(*cacheEntry)
+		if cachedEntry.stale {
+			currTimeFormatted := time.Now().In(time.UTC).Format(http.TimeFormat)
+			req.Headers["If-Modified-Since"] = currTimeFormatted
+		} else {
+			// Return cached response as it is not stale
+			fmt.Fprint(conn, cachedEntry.response)
+			duration := time.Since(timeStart)
+			log.ProxyHTTPResponse(req, &http.Response{}, duration, true)
+			return
+		}
+	}
+
+	// Response not in cache or validate cache
+	resp, err := httpclient.Request(reqURL, reqOptions)
+	if err != nil {
+		return err
+	}
+
+	// Cached response is still valid
+	if cacheFound && resp.StatusCode == 304 {
+		cachedEntry := cachedEntryInterface.(*cacheEntry)
+		fmt.Fprint(conn, cachedEntry.response)
+		duration := time.Since(timeStart)
+		log.ProxyHTTPResponse(req, resp, duration, true)
+		cachedEntry.resetTimer(uri, resp.Headers.CacheControl())
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Forward response to client.
+	fmt.Fprint(conn, resp)
+	duration := time.Since(timeStart)
+	log.ProxyHTTPResponse(req, resp, duration, false)
+	err = cacheResponse(uri, resp, cache)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func cacheResponse(uri string, resp *http.Response, cache *sync.Map) (err error) {
 	contains := func(arr []string, str string) bool {
 		for _, elem := range arr {
@@ -209,13 +204,16 @@ func cacheResponse(uri string, resp *http.Response, cache *sync.Map) (err error)
 		stale:    false,
 	}
 	cacheControl := resp.Headers.CacheControl()
-	// Should be cached
-	if !contains(cacheControl, "no-store") {
-		cache.Store(uri, newCacheEntry)
-		err = newCacheEntry.resetTimer(uri, cacheControl)
-		if err != nil {
-			return err
-		}
+	uncacheable := contains(cacheControl, "no-store") || resp.StatusCode == 304
+	// Can't be cached.
+	if uncacheable {
+		return nil
+	}
+
+	cache.Store(uri, newCacheEntry)
+	err = newCacheEntry.resetTimer(uri, cacheControl)
+	if err != nil {
+		return err
 	}
 
 	return nil
