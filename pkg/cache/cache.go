@@ -72,6 +72,8 @@ func (entry *Entry) ResetTimer(
 	reqURL string,
 	cacheControl []string,
 ) (err error) {
+	entry.Stale = false
+
 	maxAge := 0
 	for _, elem := range cacheControl {
 		if strings.HasPrefix(elem, "max-age") {
