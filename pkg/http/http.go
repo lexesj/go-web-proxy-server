@@ -7,9 +7,23 @@ import (
 	"strings"
 )
 
+// Headers is string key value map of the HTTP headers
+type Headers map[string]string
+
+// CacheControl parses the Cache-Control header
+func (headers *Headers) CacheControl() (cacheControl []string) {
+	rawCacheControl, ok := (*headers)["Cache-Control"]
+	cacheControl = []string{}
+	if ok {
+		cacheControl = strings.Split(rawCacheControl, ", ")
+	}
+
+	return cacheControl
+}
+
 // ReadHeaders will parse the HTTP headers in a HTTP message. The reader must
 // have already read the HTTP status line prior to calling this function.
-func ReadHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
+func ReadHeaders(reader *bufio.Reader) (headers Headers, err error) {
 	headers = make(map[string]string)
 
 	for {
@@ -27,10 +41,15 @@ func ReadHeaders(reader *bufio.Reader) (headers map[string]string, err error) {
 			break
 		}
 		header := strings.Split(trimmed, ": ")
-		headers[header[0]] = header[1]
+		headers[standardiseHeaderKey(header[0])] = header[1]
 	}
 
 	return headers, err
+}
+
+func standardiseHeaderKey(headerKey string) (standarisedKey string) {
+	standarisedKey = strings.Title(headerKey)
+	return standarisedKey
 }
 
 // TimeFormat is an example of the HTTP date format. It can be used in the

@@ -15,7 +15,7 @@ import (
 type Response struct {
 	StatusCode        int
 	StatusDescription string
-	Headers           map[string]string
+	Headers           Headers
 	Body              string
 	HTTPVer           string
 }

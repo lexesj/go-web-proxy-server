@@ -68,7 +68,7 @@ func ProxyHTTPSRequest(method, host, httpVersion string) {
 	proxy(
 		"HTTPS",
 		"Request",
-		ansi.LightCyan,
+		ansi.Green,
 		fmt.Sprintf(
 			"[Method: %q] [Host: %q] [HTTP Version: %q]",
 			method,
@@ -80,9 +80,17 @@ func ProxyHTTPSRequest(method, host, httpVersion string) {
 }
 
 func proxy(protocol, messageType, colour, info string, cached bool) {
-	cachedMessage := "[Cached] "
-	if !cached {
-		cachedMessage = ""
+	cachedMessage := ""
+	if cached {
+		cachedMessage = fmt.Sprintf(
+			"%s[%s%sCached%s%s]%s ",
+			ansi.Yellow,
+			ansi.Reset,
+			Bold,
+			ansi.Reset,
+			ansi.Yellow,
+			ansi.Reset,
+		)
 	}
 
 	output(fmt.Sprintf(
@@ -124,5 +132,18 @@ func ProxyListen(host string, port int) {
 		ansi.Reset,
 		ansi.LightYellow,
 		ansi.Reset,
+	))
+}
+
+// ProxyCacheStale logs a stale cache entry
+func ProxyCacheStale(requestURL string) {
+	output(fmt.Sprintf("%s[%s%sCache Stale%s%s]%s [URI: %q]\n",
+		ansi.LightRed,
+		ansi.Reset,
+		Bold,
+		ansi.Reset,
+		ansi.LightRed,
+		ansi.Reset,
+		requestURL,
 	))
 }

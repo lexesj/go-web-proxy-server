@@ -16,7 +16,7 @@ type Request struct {
 	Method  string
 	Path    string
 	HTTPVer string
-	Headers map[string]string
+	Headers Headers
 	Body    string
 }
 
