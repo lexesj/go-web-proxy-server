@@ -6,6 +6,7 @@ import (
 	logpkg "log"
 	"net"
 	urlpkg "net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,13 +19,24 @@ import (
 )
 
 func main() {
-	port := 8080
+	args := os.Args
+	if len(args) != 2 {
+		fmt.Fprintf(os.Stderr, "usage: %s <port number>\n", args[0])
+		return
+	}
+
+	port, err := strconv.Atoi(args[1])
+	if err != nil || port < 0 && port > 65535 {
+		fmt.Fprintf(os.Stderr, "error: %s is not a valid port number\n", err)
+		return
+	}
+
 	lc, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		logpkg.Fatal(err)
 	}
-	log.ProxyListen("localhost", port)
 	defer lc.Close()
+	log.ProxyListen("localhost", port)
 
 	var cache sync.Map
 	var blockList sync.Map
@@ -80,7 +92,6 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	// Handle website blocking.
 	if blocked, ok := blockList.Load(host); ok {
 		if blocked == true {
-			log.ProxyBlock(host)
 			forbiddenMessage := fmt.Sprintf("Blocked %q by proxy\n", host)
 			respHeaders := map[string]string{"Content-Length": strconv.Itoa(len(forbiddenMessage))}
 			resp := &http.Response{
@@ -91,6 +102,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 				HTTPVer:           req.HTTPVer,
 			}
 			fmt.Fprint(conn, resp)
+			log.ProxyBlock(host)
 			return
 		}
 	}
@@ -112,7 +124,6 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 }
 
 func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
-	log.ProxyHTTPSRequest(req)
 	rawurl := req.Headers["Host"]
 	url, err := urlpkg.Parse(fmt.Sprintf("https://%s/", rawurl))
 	if err != nil {
@@ -131,6 +142,7 @@ func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
 	go io.Copy(remote, conn)
 	io.Copy(conn, remote)
 
+	log.ProxyHTTPSRequest(req)
 	return nil
 }
 
@@ -170,22 +182,23 @@ func handleHTTP(conn net.Conn, req *http.Request, cache *sync.Map) (err error) {
 		cachedEntry := cachedEntryInterface.(*cacheEntry)
 		fmt.Fprint(conn, cachedEntry.response)
 		duration := time.Since(timeStart)
-		log.ProxyHTTPResponse(req, resp, duration, true)
 		cachedEntry.resetTimer(uri, resp.Headers.CacheControl())
 		if err != nil {
 			return err
 		}
+		log.ProxyHTTPResponse(req, resp, duration, true)
 		return nil
 	}
 
 	// Forward response to client.
 	fmt.Fprint(conn, resp)
 	duration := time.Since(timeStart)
-	log.ProxyHTTPResponse(req, resp, duration, false)
 	err = cacheResponse(uri, resp, cache)
 	if err != nil {
 		return err
 	}
+	log.ProxyHTTPResponse(req, resp, duration, false)
+
 	return nil
 }
 
