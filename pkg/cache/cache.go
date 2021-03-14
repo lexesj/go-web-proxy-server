@@ -17,8 +17,7 @@ type Cache struct {
 
 // NewCache returns a new Cache
 func NewCache() (cache *Cache) {
-	var cacheStore sync.Map
-	cache = &Cache{cacheMap: &cacheStore}
+	cache = &Cache{cacheMap: &sync.Map{}}
 
 	return cache
 }

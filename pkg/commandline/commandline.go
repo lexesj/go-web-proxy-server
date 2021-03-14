@@ -59,6 +59,15 @@ func Dispatcher(blockList *sync.Map, metrics *metrics.Metrics) {
 				}
 
 				fmt.Println(metrics)
+			case "clear":
+				if len(tokens) > 1 {
+					fmt.Fprintf(os.Stderr, "usage: clear\n")
+					continue
+				}
+
+				// Move cursor to (0,0) and clear console
+				fmt.Print("\033[0;0H")
+				fmt.Print("\033[2J")
 			default:
 				fmt.Printf("proxy: %q: command not found\n", tokens[0])
 			}

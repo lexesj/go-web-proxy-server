@@ -140,7 +140,6 @@ func handleHTTP(conn net.Conn, req *http.Request, cache *cache.Cache, metrics *m
 			// Return cached response as it is not stale
 			fmt.Fprint(conn, cachedEntry.Response)
 			duration := time.Since(startTime)
-			println("not stale boi")
 			log.ProxyHTTPResponse(req, &http.Response{}, duration, true)
 			metrics.AddMetrics(reqURL, cachedEntry, duration, 0)
 			return
@@ -161,8 +160,6 @@ func handleHTTP(conn net.Conn, req *http.Request, cache *cache.Cache, metrics *m
 		if err != nil {
 			return err
 		}
-		println(resp.String())
-		println("unloco stale boi")
 		log.ProxyHTTPResponse(req, resp, duration, true)
 		metrics.AddMetrics(reqURL, cachedEntry, duration, int64(len(resp.String())))
 		return nil
