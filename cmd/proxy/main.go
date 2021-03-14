@@ -99,8 +99,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 	// Handle HTTPS request.
 	if req.Method == "CONNECT" {
-		log.ProxyHTTPSRequest(req.Method, host, req.HTTPVer)
-		err := handleHTTPS(conn, host, req.HTTPVer)
+		err := handleHTTPS(conn, req)
 		if err != nil {
 			log.ProxyError(err)
 		}
@@ -129,16 +128,8 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 			// Cached response is still valid
 			if resp.StatusCode == 304 {
 				fmt.Fprint(conn, cachedEntry.response)
-				bandwidth := len(resp.String())
 				duration := time.Since(timeStart)
-				log.ProxyHTTPResponse(
-					req.Method,
-					reqURL,
-					req.HTTPVer,
-					duration.String(),
-					bandwidth,
-					true,
-				)
+				log.ProxyHTTPResponse(req, resp, duration.String(), true)
 				cachedEntry.resetTimer(uri, resp.Headers.CacheControl())
 				if err != nil {
 					log.ProxyError(err)
@@ -148,16 +139,8 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 			// Forward response to client.
 			fmt.Fprint(conn, resp)
-			bandwidth := len(resp.String())
 			duration := time.Since(timeStart)
-			log.ProxyHTTPResponse(
-				req.Method,
-				reqURL,
-				req.HTTPVer,
-				duration.String(),
-				bandwidth,
-				false,
-			)
+			log.ProxyHTTPResponse(req, resp, duration.String(), false)
 			err = cacheResponse(uri, resp, cache)
 			if err != nil {
 				log.ProxyError(err)
@@ -166,14 +149,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 			// Return cached response as it is not stale
 			fmt.Fprint(conn, cachedEntry.response)
 			duration := time.Since(timeStart)
-			log.ProxyHTTPResponse(
-				req.Method,
-				reqURL,
-				req.HTTPVer,
-				duration.String(),
-				0,
-				true,
-			)
+			log.ProxyHTTPResponse(req, &http.Response{}, duration.String(), true)
 		}
 		return
 	}
@@ -187,23 +163,17 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 
 	// Forward response to client.
 	fmt.Fprint(conn, resp)
-	bandwidth := len(resp.String())
 	duration := time.Since(timeStart)
-	log.ProxyHTTPResponse(
-		req.Method,
-		reqURL,
-		req.HTTPVer,
-		duration.String(),
-		bandwidth,
-		false,
-	)
+	log.ProxyHTTPResponse(req, resp, duration.String(), false)
 	err = cacheResponse(uri, resp, cache)
 	if err != nil {
 		log.ProxyError(err)
 	}
 }
 
-func handleHTTPS(conn net.Conn, rawurl, httpVer string) (err error) {
+func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
+	log.ProxyHTTPSRequest(req)
+	rawurl := req.Headers["Host"]
 	url, err := urlpkg.Parse(fmt.Sprintf("https://%s/", rawurl))
 	if err != nil {
 		return err

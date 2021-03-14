@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lexesjan/go-web-proxy-server/pkg/http"
 	"github.com/mgutz/ansi"
 )
 
@@ -46,7 +47,12 @@ func ProxyError(err error) {
 }
 
 // ProxyHTTPResponse logs a proxy HTTP response
-func ProxyHTTPResponse(method, requestURL, httpVersion, time string, bandwidth int, cached bool) {
+func ProxyHTTPResponse(req *http.Request, resp *http.Response, time string, cached bool) {
+	method := req.Method
+	host := req.Headers["Host"]
+	reqURL := fmt.Sprintf("http://%s%s", host, req.Path)
+	httpVersion := resp.HTTPVer
+	bandwidth := len(resp.String())
 	proxy(
 		"HTTP",
 		"Response",
@@ -54,7 +60,7 @@ func ProxyHTTPResponse(method, requestURL, httpVersion, time string, bandwidth i
 		fmt.Sprintf(
 			"[Method: %q] [Request URL: %q] [HTTP Version: %q] [Bandwidth: %d bytes] [Time: %s]",
 			method,
-			requestURL,
+			reqURL,
 			httpVersion,
 			bandwidth,
 			time,
@@ -64,7 +70,10 @@ func ProxyHTTPResponse(method, requestURL, httpVersion, time string, bandwidth i
 }
 
 // ProxyHTTPSRequest logs a proxy HTTPS request
-func ProxyHTTPSRequest(method, host, httpVersion string) {
+func ProxyHTTPSRequest(req *http.Request) {
+	method := req.Method
+	host := req.Headers["Host"]
+	httpVersion := req.HTTPVer
 	proxy(
 		"HTTPS",
 		"Request",

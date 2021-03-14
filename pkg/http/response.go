@@ -88,7 +88,18 @@ func readResponseStatus(reader *bufio.Reader) (httpVer string, statusCode int, s
 func (resp *Response) String() (str string) {
 	var builder strings.Builder
 
-	fmt.Fprintf(&builder, "%s %d %s\r\n", resp.HTTPVer, resp.StatusCode, resp.StatusDescription)
+	if resp.HTTPVer == "" || resp.StatusCode == 0 ||
+		resp.StatusDescription == "" {
+		return builder.String()
+	}
+
+	fmt.Fprintf(
+		&builder,
+		"%s %d %s\r\n",
+		resp.HTTPVer,
+		resp.StatusCode,
+		resp.StatusDescription,
+	)
 	for k, v := range resp.Headers {
 		fmt.Fprintf(&builder, "%s: %s\r\n", k, v)
 	}

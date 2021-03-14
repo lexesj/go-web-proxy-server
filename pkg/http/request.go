@@ -88,6 +88,10 @@ func readRequestStatus(reader *bufio.Reader) (method, url, httpVer string, err e
 func (req *Request) String() (str string) {
 	var builder strings.Builder
 
+	if req.Method == "" || req.HTTPVer == "" {
+		return builder.String()
+	}
+
 	fmt.Fprintf(&builder, "%s %s %s\r\n", req.Method, req.Path, req.HTTPVer)
 	for k, v := range req.Headers {
 		fmt.Fprintf(&builder, "%s: %s\r\n", k, v)
