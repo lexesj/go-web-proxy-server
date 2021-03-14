@@ -54,12 +54,19 @@ func NewRequest(conn net.Conn) (req *Request, err error) {
 
 	// Parse body if exists.
 	if _, ok := requestHeaders["Content-Length"]; ok {
-		contentLength, err := strconv.ParseInt(requestHeaders["Content-Length"], 10, 0)
+		contentLength, err := strconv.ParseInt(
+			requestHeaders["Content-Length"],
+			10,
+			0,
+		)
 		if err != nil {
 			return &Request{}, err
 		}
 
-		body, err := ioutil.ReadAll(io.LimitReader(reader, contentLength))
+		body, err := ioutil.ReadAll(io.LimitReader(
+			reader,
+			contentLength,
+		))
 		if err != nil {
 			return &Request{}, err
 		}
@@ -70,7 +77,12 @@ func NewRequest(conn net.Conn) (req *Request, err error) {
 	return req, nil
 }
 
-func readRequestStatus(reader *bufio.Reader) (method, url, httpVer string, err error) {
+func readRequestStatus(reader *bufio.Reader) (
+	method,
+	url,
+	httpVer string,
+	err error,
+) {
 	statusLine, err := reader.ReadString('\n')
 	if err != nil {
 		return "", "", "", err

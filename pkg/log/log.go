@@ -29,7 +29,7 @@ type Logger struct {
 	mu sync.Mutex
 }
 
-func NewLogger() (logger *Logger) {
+func newLogger() (logger *Logger) {
 	logger = &Logger{}
 	return logger
 }
@@ -44,7 +44,7 @@ func (logger *Logger) output(str string) {
 	fmt.Fprintf(os.Stderr, "\r%s %s%s", currentTime, str, Prompt)
 }
 
-var logger = NewLogger()
+var logger = newLogger()
 
 // ProxyError logs an error has occurred and the message
 func ProxyError(err error) {
@@ -160,7 +160,7 @@ func ProxyListen(host string, port int) {
 
 // ProxyCacheStale logs a stale cache entry
 func ProxyCacheStale(requestURL string) {
-	logger.output(fmt.Sprintf("%s[%s%sCache Stale%s%s]%s [URI: %q]\n",
+	logger.output(fmt.Sprintf("%s[%s%sCache Stale%s%s]%s [Request URL: %q]\n",
 		ansi.LightRed,
 		ansi.Reset,
 		Bold,

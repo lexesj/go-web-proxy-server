@@ -8,10 +8,11 @@ import (
 	"sync"
 
 	"github.com/lexesjan/go-web-proxy-server/pkg/log"
+	"github.com/lexesjan/go-web-proxy-server/pkg/metrics"
 )
 
-// Dispatcher handles the user input and modifies the blockList
-func Dispatcher(blockList *sync.Map) {
+// Dispatcher handles the user input
+func Dispatcher(blockList *sync.Map, metrics *metrics.Metrics) {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf("\r%s", log.Prompt)
@@ -26,7 +27,7 @@ func Dispatcher(blockList *sync.Map) {
 		if command != "" {
 			switch command {
 			case "block":
-				if len(tokens) == 1 {
+				if len(tokens) == 1 || len(tokens) > 2 {
 					fmt.Fprintf(os.Stderr, "usage: block <domain name>\n")
 					continue
 				}
@@ -39,8 +40,9 @@ func Dispatcher(blockList *sync.Map) {
 					fmt.Fprintf(os.Stderr, "%s: website %q already blocked\n", command, website)
 				}
 			case "unblock":
-				if len(tokens) == 1 {
+				if len(tokens) == 1 || len(tokens) > 2 {
 					fmt.Fprintf(os.Stderr, "usage: unblock <domain name>\n")
+					continue
 				}
 
 				website := tokens[1]
@@ -50,6 +52,13 @@ func Dispatcher(blockList *sync.Map) {
 				} else {
 					fmt.Fprintf(os.Stderr, "%s: website %q not blocked\n", command, website)
 				}
+			case "metrics":
+				if len(tokens) > 1 {
+					fmt.Fprintf(os.Stderr, "usage: metrics\n")
+					continue
+				}
+
+				fmt.Println(metrics)
 			default:
 				fmt.Printf("proxy: %q: command not found\n", tokens[0])
 			}

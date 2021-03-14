@@ -44,7 +44,11 @@ func NewResponse(conn net.Conn) (resp *Response, err error) {
 
 	// Parse Body if exists
 	if _, ok := responseHeaders["Content-Length"]; ok {
-		contentLength, err := strconv.ParseInt(responseHeaders["Content-Length"], 10, 0)
+		contentLength, err := strconv.ParseInt(
+			responseHeaders["Content-Length"],
+			10,
+			0,
+		)
 		if err != nil {
 			return &Response{}, err
 		}
@@ -65,7 +69,12 @@ func NewResponse(conn net.Conn) (resp *Response, err error) {
 	return resp, nil
 }
 
-func readResponseStatus(reader *bufio.Reader) (httpVer string, statusCode int, statusDescription string, err error) {
+func readResponseStatus(reader *bufio.Reader) (
+	httpVer string,
+	statusCode int,
+	statusDescription string,
+	err error,
+) {
 	statusLine, err := reader.ReadString('\n')
 	if err != nil {
 		return "", 0, "", err
@@ -80,7 +89,7 @@ func readResponseStatus(reader *bufio.Reader) (httpVer string, statusCode int, s
 	}
 
 	statusCode = int(statusCodeInt64)
-	statusDescription = status[2]
+	statusDescription = strings.Join(status[2:], " ")
 
 	return httpVer, statusCode, statusDescription, err
 }

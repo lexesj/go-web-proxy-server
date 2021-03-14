@@ -8,14 +8,15 @@ import (
 	urlpkg "net/url"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/lexesjan/go-web-proxy-server/pkg/cache"
 	"github.com/lexesjan/go-web-proxy-server/pkg/commandline"
 	"github.com/lexesjan/go-web-proxy-server/pkg/http"
 	"github.com/lexesjan/go-web-proxy-server/pkg/httpclient"
 	"github.com/lexesjan/go-web-proxy-server/pkg/log"
+	"github.com/lexesjan/go-web-proxy-server/pkg/metrics"
 )
 
 func main() {
@@ -38,10 +39,11 @@ func main() {
 	defer lc.Close()
 	log.ProxyListen("localhost", port)
 
-	var cache sync.Map
+	cache := cache.NewCache()
 	var blockList sync.Map
+	metrics := metrics.NewMetrics()
 
-	go commandline.Dispatcher(&blockList)
+	go commandline.Dispatcher(&blockList, metrics)
 
 	for {
 		conn, err := lc.Accept()
@@ -49,37 +51,11 @@ func main() {
 			logpkg.Fatal(err)
 		}
 
-		go handleConnection(conn, &cache, &blockList)
+		go handleConnection(conn, cache, &blockList, metrics)
 	}
 }
 
-type cacheEntry struct {
-	response string
-	stale    bool
-}
-
-func (entry *cacheEntry) resetTimer(uri string, cacheControl []string) (err error) {
-	maxAge := 0
-	for _, elem := range cacheControl {
-		if strings.HasPrefix(elem, "max-age") {
-			tokens := strings.Split(elem, "=")
-			maxAge, err = strconv.Atoi(tokens[1])
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	// Mark expired cache as stale
-	time.AfterFunc(time.Duration(maxAge)*time.Second, func() {
-		entry.stale = true
-		log.ProxyCacheStale(uri)
-	})
-
-	return nil
-}
-
-func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
+func handleConnection(conn net.Conn, cache *cache.Cache, blockList *sync.Map, metrics *metrics.Metrics) {
 	defer conn.Close()
 
 	req, err := http.NewRequest(conn)
@@ -117,7 +93,7 @@ func handleConnection(conn net.Conn, cache, blockList *sync.Map) {
 	}
 
 	// Handle HTTP request.
-	err = handleHTTP(conn, req, cache)
+	err = handleHTTP(conn, req, cache, metrics)
 	if err != nil {
 		log.ProxyError(err)
 	}
@@ -146,27 +122,27 @@ func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
 	return nil
 }
 
-func handleHTTP(conn net.Conn, req *http.Request, cache *sync.Map) (err error) {
+func handleHTTP(conn net.Conn, req *http.Request, cache *cache.Cache, metrics *metrics.Metrics) (err error) {
+	startTime := time.Now()
 	host := req.Headers["Host"]
-	timeStart := time.Now()
-	uri := fmt.Sprintf("%s%s", host, req.Path)
 	reqOptions := &httpclient.Options{
 		Method:  req.Method,
 		HTTPVer: req.HTTPVer,
 		Headers: req.Headers,
 	}
 	reqURL := fmt.Sprintf("http://%s%s", host, req.Path)
-	cachedEntryInterface, cacheFound := cache.Load(uri)
+	cachedEntry, cacheFound := cache.Get(reqURL)
 	if cacheFound {
-		cachedEntry := cachedEntryInterface.(*cacheEntry)
-		if cachedEntry.stale {
+		if cachedEntry.Stale {
 			currTimeFormatted := time.Now().In(time.UTC).Format(http.TimeFormat)
 			req.Headers["If-Modified-Since"] = currTimeFormatted
 		} else {
 			// Return cached response as it is not stale
-			fmt.Fprint(conn, cachedEntry.response)
-			duration := time.Since(timeStart)
+			fmt.Fprint(conn, cachedEntry.Response)
+			duration := time.Since(startTime)
+			println("not stale boi")
 			log.ProxyHTTPResponse(req, &http.Response{}, duration, true)
+			metrics.AddMetrics(reqURL, cachedEntry, duration, 0)
 			return
 		}
 	}
@@ -179,55 +155,27 @@ func handleHTTP(conn net.Conn, req *http.Request, cache *sync.Map) (err error) {
 
 	// Cached response is still valid
 	if cacheFound && resp.StatusCode == 304 {
-		cachedEntry := cachedEntryInterface.(*cacheEntry)
-		fmt.Fprint(conn, cachedEntry.response)
-		duration := time.Since(timeStart)
-		cachedEntry.resetTimer(uri, resp.Headers.CacheControl())
+		fmt.Fprint(conn, cachedEntry.Response)
+		duration := time.Since(startTime)
+		cachedEntry.ResetTimer(reqURL, resp.Headers.CacheControl())
 		if err != nil {
 			return err
 		}
+		println(resp.String())
+		println("unloco stale boi")
 		log.ProxyHTTPResponse(req, resp, duration, true)
+		metrics.AddMetrics(reqURL, cachedEntry, duration, int64(len(resp.String())))
 		return nil
 	}
 
 	// Forward response to client.
 	fmt.Fprint(conn, resp)
-	duration := time.Since(timeStart)
-	err = cacheResponse(uri, resp, cache)
+	duration := time.Since(startTime)
+	err = cache.CacheResponse(reqURL, resp, duration)
 	if err != nil {
 		return err
 	}
 	log.ProxyHTTPResponse(req, resp, duration, false)
-
-	return nil
-}
-
-func cacheResponse(uri string, resp *http.Response, cache *sync.Map) (err error) {
-	contains := func(arr []string, str string) bool {
-		for _, elem := range arr {
-			if elem == str {
-				return true
-			}
-		}
-		return false
-	}
-
-	newCacheEntry := &cacheEntry{
-		response: resp.String(),
-		stale:    false,
-	}
-	cacheControl := resp.Headers.CacheControl()
-	uncacheable := contains(cacheControl, "no-store") || resp.StatusCode == 304
-	// Can't be cached.
-	if uncacheable {
-		return nil
-	}
-
-	cache.Store(uri, newCacheEntry)
-	err = newCacheEntry.resetTimer(uri, cacheControl)
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
