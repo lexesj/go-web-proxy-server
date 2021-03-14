@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lexesjan/go-web-proxy-server/pkg/http"
@@ -24,17 +25,30 @@ var Prompt = fmt.Sprintf(
 	ansi.Reset,
 )
 
-func output(str string) {
+type Logger struct {
+	mu sync.Mutex
+}
+
+func NewLogger() (logger *Logger) {
+	logger = &Logger{}
+	return logger
+}
+
+func (logger *Logger) output(str string) {
+	logger.mu.Lock()
 	currentTime := time.Now().Format("01/02/06 15:04:05")
 	if !strings.HasSuffix(str, "\n") {
 		str = str + "\n"
 	}
 	fmt.Fprintf(os.Stderr, "\r%s %s%s", currentTime, str, Prompt)
+	logger.mu.Unlock()
 }
+
+var logger = NewLogger()
 
 // ProxyError logs an error has occurred and the message
 func ProxyError(err error) {
-	output(fmt.Sprintf(
+	logger.output(fmt.Sprintf(
 		"%s[%s%sError%s%s]%s [Message: %q]\n",
 		ansi.LightRed,
 		ansi.Reset,
@@ -47,7 +61,7 @@ func ProxyError(err error) {
 }
 
 // ProxyHTTPResponse logs a proxy HTTP response
-func ProxyHTTPResponse(req *http.Request, resp *http.Response, time string, cached bool) {
+func ProxyHTTPResponse(req *http.Request, resp *http.Response, time time.Duration, cached bool) {
 	method := req.Method
 	host := req.Headers["Host"]
 	reqURL := fmt.Sprintf("http://%s%s", host, req.Path)
@@ -102,7 +116,7 @@ func proxy(protocol, messageType, colour, info string, cached bool) {
 		)
 	}
 
-	output(fmt.Sprintf(
+	logger.output(fmt.Sprintf(
 		"%s%s[%s%s%s %s%s%s]%s %s\n",
 		cachedMessage,
 		colour,
@@ -119,7 +133,7 @@ func proxy(protocol, messageType, colour, info string, cached bool) {
 
 // ProxyBlock logs blocked message when the proxy blocks a website
 func ProxyBlock(host string) {
-	output(fmt.Sprintf(
+	logger.output(fmt.Sprintf(
 		"%s[%sBlocked%s]%s [Host %q]\n",
 		ansi.Magenta,
 		ansi.Reset,
@@ -131,7 +145,7 @@ func ProxyBlock(host string) {
 
 // ProxyListen logs the listening message on proxy startup
 func ProxyListen(host string, port int) {
-	output(fmt.Sprintf(
+	logger.output(fmt.Sprintf(
 		"%s[%s%sListening on \"http://%s:%d\"%s%s]%s\n",
 		ansi.LightYellow,
 		ansi.Reset,
@@ -146,7 +160,7 @@ func ProxyListen(host string, port int) {
 
 // ProxyCacheStale logs a stale cache entry
 func ProxyCacheStale(requestURL string) {
-	output(fmt.Sprintf("%s[%s%sCache Stale%s%s]%s [URI: %q]\n",
+	logger.output(fmt.Sprintf("%s[%s%sCache Stale%s%s]%s [URI: %q]\n",
 		ansi.LightRed,
 		ansi.Reset,
 		Bold,
