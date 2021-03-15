@@ -25,6 +25,7 @@ var Prompt = fmt.Sprintf(
 	ansi.Reset,
 )
 
+// Logger contains a mutex lock to prevent print overwriting
 type Logger struct {
 	mu sync.Mutex
 }

@@ -55,7 +55,12 @@ func main() {
 	}
 }
 
-func handleConnection(conn net.Conn, cache *cache.Cache, blockList *sync.Map, metrics *metrics.Metrics) {
+func handleConnection(
+	conn net.Conn,
+	cache *cache.Cache,
+	blockList *sync.Map,
+	metrics *metrics.Metrics,
+) {
 	defer conn.Close()
 
 	req, err := http.NewRequest(conn)
@@ -69,7 +74,9 @@ func handleConnection(conn net.Conn, cache *cache.Cache, blockList *sync.Map, me
 	if blocked, ok := blockList.Load(host); ok {
 		if blocked == true {
 			forbiddenMessage := fmt.Sprintf("Blocked %q by proxy\n", host)
-			respHeaders := map[string]string{"Content-Length": strconv.Itoa(len(forbiddenMessage))}
+			respHeaders := map[string]string{
+				"Content-Length": strconv.Itoa(len(forbiddenMessage)),
+			}
 			resp := &http.Response{
 				StatusCode:        403,
 				StatusDescription: "Forbidden",
@@ -122,7 +129,12 @@ func handleHTTPS(conn net.Conn, req *http.Request) (err error) {
 	return nil
 }
 
-func handleHTTP(conn net.Conn, req *http.Request, cache *cache.Cache, metrics *metrics.Metrics) (err error) {
+func handleHTTP(
+	conn net.Conn,
+	req *http.Request,
+	cache *cache.Cache,
+	metrics *metrics.Metrics,
+) (err error) {
 	startTime := time.Now()
 	host := req.Headers["Host"]
 	reqOptions := &httpclient.Options{

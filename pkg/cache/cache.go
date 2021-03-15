@@ -30,6 +30,8 @@ type Entry struct {
 	UncachedBandwidth    int64
 }
 
+// CacheResponse adds a HTTP response to the cache and starts a timer which
+// marks the cache entry stale
 func (cache *Cache) CacheResponse(
 	reqURL string,
 	resp *http.Response,
