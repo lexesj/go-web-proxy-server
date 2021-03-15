@@ -87,17 +87,20 @@ without parsing it.
 
 The `handleHTTP()` handles all the HTTP connections between the client and
 the host server. Upon receiving a HTTP request, the request is parsed using
-my `http` package. The `NewRequest()` function parses the status line,
+the `http` package. The `NewRequest()` function parses the status line,
 headers and the body if it exists. The standard package `bufio` is used to
 read the HTTP message one line at a time. The status line is read and stored
 into a `Response` struct. The headers are then read and parsed. If the
 `Content-Length` header exists, then the body is also read and parsed.
 
 Using the newly created `Request` struct, the host header is used to
-establish a TCP connection with the host server. My `` httpclient'' package is then used to send the request status line along with the headers and the body to the host server. The response is then parsed using the `NewResponse()` function in my  ``http'' package. The
-`Response` struct is created which stores all the information from
-the response received from the host server. This is then simply forwarded to
-the client. Caching is explained in another section of this document.
+establish a TCP connection with the host server. The `httpclient` package is
+then used to send the request status line along with the headers and the body
+to the host server. The response is then parsed using the `NewResponse()`
+function in the `http` package. The `Response` struct is created which stores
+all the information from the response received from the host server. This is
+then simply forwarded to the client. Caching is explained in another section
+of this document.
 
 ### Websocket connections
 
@@ -108,7 +111,7 @@ between the client and the desired host server.
 
 ### Dynamic URL Blocking
 
-My `commandline` package handles the user input and allows the user to type
+The `commandline` package handles the user input and allows the user to type
 the `block` and `unblock` command. The `block` command adds a url host to
 the block list. The block list is simply a map which contains a list of URLs
 and a boolean stating whether or not the URL is blocked. If the URL is not
@@ -121,7 +124,7 @@ passed is then removed from the block list.
 
 ### Caching HTTP requests
 
-In the `handleHTTP()` function, my `cache` package is used. The
+In the `handleHTTP()` function, the `cache` package is used. The
 underlying implementation of the cache is a map which maps the full URL without
 query parameters to a string containing the full HTTP message. If there is a
 cache miss, the HTTP request is forwarded to the desired host server. The
@@ -144,10 +147,10 @@ client.
 ### Metrics
 
 Metrics of the time it took to serve the client and the bandwidth is used is
-obtained using my `metrics` package. When a HTTP request is made, a snippet
+obtained using the `metrics` package. When a HTTP request is made, a snippet
 of the current time is saved on call of the `handleHTTP()` function.
 Another snippet of the current time is saved before the return of the
-`handleHTTP()` function. This time is used in my `metrics` package
+`handleHTTP()` function. This time is used in the `metrics` package
 which stores a map of the hostname to a map of the full url and the time saved
 compared to an uncached response. The time saved is calculated by subtracting
 the time it took to fulfill an uncached request from the time it took to
