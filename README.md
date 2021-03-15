@@ -72,7 +72,7 @@ Clears the console output
    ```
 1. Build the proxy
    ```
-   go build ./cmd/proxy
+   go build ./cmd/goproxy
    ```
 1. Run the proxy
    ```
