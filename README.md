@@ -29,7 +29,7 @@ Unblocks the domain specified e.g. `unblock www.example.com` unblocks any
 connections to `www.example.com`
 
 ```
-usage: block <domain name>
+usage: unblock <domain name>
 ```
 
 #### `metrics`
