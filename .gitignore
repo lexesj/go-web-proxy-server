@@ -15,4 +15,4 @@
 # vendor/
 
 # proxy binary
-proxy
+goproxy
